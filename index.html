@@ -276,6 +276,20 @@
           <span class="slider-value" id="directionValue">215°</span>
         </div>
       </div>
+      <div class="control-group" style="padding-top: 1rem">
+        <a
+          href="https://github.com/npanium/chromatic-distortion/"
+          target="_blank"
+          rel="noopener"
+          style="
+            padding: 1rem;
+            margin: auto;
+            text-decoration: none;
+            font-size: 14px;
+          "
+          >GitHub →</a
+        >
+      </div>
     </div>
 
     <div class="canvas-container">
@@ -582,7 +596,7 @@
 
       // Render text to canvas
       function renderText() {
-        const text = document.getElementById("textInput").value || "GLITCH";
+        const text = document.getElementById("textInput").value || "Distort";
         const font = document.getElementById("fontSelect").value;
 
         textCtx.fillStyle = "#000";
