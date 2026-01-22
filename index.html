@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chromatic Text Distortion</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #ffffe3;
+        color: #30302b;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .controls {
+        padding: 12px 20px;
+        background: #f0f0d4;
+        border-bottom: 1px solid #d0d0b0;
+      }
+
+      .toggle-btn {
+        background: none;
+        border: 1px solid #a0a090;
+        color: #30302b;
+        padding: 10px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .toggle-btn:hover {
+        background: #e8e8d0;
+      }
+
+      .toggle-icon {
+        transition: transform 0.3s ease;
+      }
+
+      .toggle-btn.collapsed .toggle-icon {
+        transform: rotate(-90deg);
+      }
+
+      .controls-content {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        align-items: flex-end;
+        margin-top: 16px;
+        overflow: hidden;
+        transition:
+          max-height 0.3s ease,
+          margin-top 0.3s ease,
+          opacity 0.3s ease;
+        max-height: 500px;
+        opacity: 1;
+      }
+
+      .controls-content.collapsed {
+        max-height: 0;
+        margin-top: 0;
+        opacity: 0;
+      }
+
+      @media (min-width: 768px) {
+        .toggle-btn {
+          display: none;
+        }
+        .controls-content {
+          margin-top: 0;
+        }
+        .controls-content.collapsed {
+          max-height: 500px;
+          opacity: 1;
+        }
+      }
+
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .control-group label {
+        font-size: 12px;
+        color: #606050;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .control-group input[type="text"],
+      .control-group select {
+        background: #ffffe3;
+        border: 1px solid #a0a090;
+        color: #30302b;
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-size: 14px;
+        min-width: 200px;
+      }
+
+      .control-group input[type="text"]:focus,
+      .control-group select:focus {
+        outline: none;
+        border-color: #30302b;
+      }
+
+      .control-group input[type="range"] {
+        width: 150px;
+        accent-color: #30302b;
+      }
+
+      .slider-value {
+        font-size: 11px;
+        color: #707060;
+        text-align: right;
+      }
+
+      .canvas-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      canvas {
+        max-width: 100%;
+        border-radius: 8px;
+      }
+
+      #textCanvas {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <button class="toggle-btn" id="toggleControls">
+        <span class="toggle-icon">▼</span> Controls
+      </button>
+      <div class="controls-content" id="controlsContent">
+        <div class="control-group">
+          <label>Text</label>
+          <input
+            type="text"
+            id="textInput"
+            value="Distort"
+            placeholder="Enter text..."
+          />
+        </div>
+
+        <div class="control-group">
+          <label>Font</label>
+          <select id="fontSelect">
+            <option value="Arial Black">Arial Black</option>
+            <option value="Impact">Impact</option>
+            <option value="Georgia" selected>Georgia</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Trebuchet MS">Trebuchet MS</option>
+            <option value="Comic Sans MS">Comic Sans MS</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>Noise Type</label>
+          <select id="noiseType">
+            <option value="white">White Noise</option>
+            <option value="perlin">Perlin-like</option>
+            <option value="simplex">Simplex-like</option>
+            <option value="worley">Worley/Cellular</option>
+            <option value="fbm">FBM (Fractal)</option>
+            <option value="turbulence" selected>Turbulence</option>
+            <option value="ridged">Ridged</option>
+            <option value="gradient">Gradient</option>
+            <option value="stripes">Stripes</option>
+            <option value="checker">Checker</option>
+            <option value="custom">Custom Image...</option>
+          </select>
+        </div>
+
+        <div class="control-group" id="customImageGroup" style="display: none">
+          <label>Upload Image</label>
+          <input type="file" id="customImage" accept="image/*" />
+        </div>
+
+        <div class="control-group">
+          <label>Distortion Strength</label>
+          <input
+            type="range"
+            id="distortionStrength"
+            min="0.01"
+            max="0.5"
+            step="0.01"
+            value="0.06"
+          />
+          <span class="slider-value" id="distortionValue">0.06</span>
+        </div>
+
+        <div class="control-group">
+          <label>Chromatic Spread</label>
+          <input
+            type="range"
+            id="chromaticSpread"
+            min="0"
+            max="0.1"
+            step="0.001"
+            value="0.01"
+          />
+          <span class="slider-value" id="chromaticValue">0.01</span>
+        </div>
+
+        <div class="control-group">
+          <label>Noise Scale</label>
+          <input
+            type="range"
+            id="noiseScale"
+            min="0.01"
+            max="5"
+            step="0.01"
+            value="0.75"
+          />
+          <span class="slider-value" id="noiseValue">0.75</span>
+        </div>
+
+        <div class="control-group">
+          <label>Animation Speed</label>
+          <input
+            type="range"
+            id="animSpeed"
+            min="0"
+            max="1"
+            step="0.01"
+            value="0.07"
+          />
+          <span class="slider-value" id="speedValue">0.07</span>
+        </div>
+
+        <div class="control-group">
+          <label>Edge Softness</label>
+          <input
+            type="range"
+            id="edgeSoftness"
+            min="0.001"
+            max="0.2"
+            step="0.001"
+            value="0.032"
+          />
+          <span class="slider-value" id="edgeValue">0.032</span>
+        </div>
+
+        <div class="control-group">
+          <label>Direction</label>
+          <input
+            type="range"
+            id="direction"
+            min="0"
+            max="6.28"
+            step="0.01"
+            value="3.75"
+          />
+          <span class="slider-value" id="directionValue">215°</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas-container">
+      <canvas id="glCanvas" width="1200" height="600"></canvas>
+    </div>
+
+    <canvas id="textCanvas" width="1200" height="600"></canvas>
+    <canvas id="noiseCanvas" width="512" height="512"></canvas>
+
+    <script>
+      const glCanvas = document.getElementById("glCanvas");
+      const gl = glCanvas.getContext("webgl");
+      const textCanvas = document.getElementById("textCanvas");
+      const textCtx = textCanvas.getContext("2d");
+      const noiseCanvas = document.getElementById("noiseCanvas");
+      const noiseCtx = noiseCanvas.getContext("2d");
+
+      // Noise generation functions
+      function hash(x, y) {
+        let n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        return n - Math.floor(n);
+      }
+
+      function smoothNoise(x, y) {
+        const ix = Math.floor(x);
+        const iy = Math.floor(y);
+        const fx = x - ix;
+        const fy = y - iy;
+
+        const a = hash(ix, iy);
+        const b = hash(ix + 1, iy);
+        const c = hash(ix, iy + 1);
+        const d = hash(ix + 1, iy + 1);
+
+        const ux = fx * fx * (3 - 2 * fx);
+        const uy = fy * fy * (3 - 2 * fy);
+
+        return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+      }
+
+      function fbmNoise(x, y, octaves) {
+        let value = 0;
+        let amplitude = 0.5;
+        let frequency = 1;
+        for (let i = 0; i < octaves; i++) {
+          value += amplitude * smoothNoise(x * frequency, y * frequency);
+          amplitude *= 0.5;
+          frequency *= 2;
+        }
+        return value;
+      }
+
+      function worleyNoise(x, y) {
+        const ix = Math.floor(x);
+        const iy = Math.floor(y);
+        let minDist = 1;
+
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            const px = ix + dx + hash(ix + dx, iy + dy);
+            const py = iy + dy + hash(iy + dy, ix + dx);
+            const dist = Math.sqrt((x - px) ** 2 + (y - py) ** 2);
+            minDist = Math.min(minDist, dist);
+          }
+        }
+        return minDist;
+      }
+
+      function generateNoise(type = "white") {
+        const imageData = noiseCtx.createImageData(512, 512);
+        const scale = 32;
+
+        for (let y = 0; y < 512; y++) {
+          for (let x = 0; x < 512; x++) {
+            const i = (y * 512 + x) * 4;
+            let v;
+
+            const nx = x / scale;
+            const ny = y / scale;
+
+            switch (type) {
+              case "white":
+                v = Math.random();
+                break;
+              case "perlin":
+                v = smoothNoise(nx, ny);
+                break;
+              case "simplex":
+                v =
+                  smoothNoise(nx * 1.5, ny * 1.5) * 0.6 +
+                  smoothNoise(nx * 3, ny * 3) * 0.3 +
+                  smoothNoise(nx * 6, ny * 6) * 0.1;
+                break;
+              case "worley":
+                v = worleyNoise(nx, ny);
+                break;
+              case "fbm":
+                v = fbmNoise(nx, ny, 6);
+                break;
+              case "turbulence":
+                v = Math.abs(fbmNoise(nx, ny, 6) * 2 - 1);
+                break;
+              case "ridged":
+                v = 1 - Math.abs(fbmNoise(nx, ny, 4) * 2 - 1);
+                v = v * v;
+                break;
+              case "gradient":
+                v = (x + y) / 1024;
+                break;
+              case "stripes":
+                v = (Math.sin(nx * 2) + 1) / 2;
+                break;
+              case "checker":
+                v = (Math.floor(nx) + Math.floor(ny)) % 2 === 0 ? 0 : 1;
+                break;
+              default:
+                v = Math.random();
+            }
+
+            v = Math.max(0, Math.min(1, v)) * 255;
+            imageData.data[i] = v;
+            imageData.data[i + 1] = v;
+            imageData.data[i + 2] = v;
+            imageData.data[i + 3] = 255;
+          }
+        }
+        noiseCtx.putImageData(imageData, 0, 0);
+        updateNoiseTexture();
+      }
+
+      function updateNoiseTexture() {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          noiseCanvas,
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      }
+
+      function loadCustomImage(file) {
+        const img = new Image();
+        img.onload = () => {
+          noiseCtx.drawImage(img, 0, 0, 512, 512);
+          updateNoiseTexture();
+        };
+        img.src = URL.createObjectURL(file);
+      }
+
+      // Shader sources
+      const vertexShaderSource = `
+            attribute vec2 a_position;
+            attribute vec2 a_texCoord;
+            varying vec2 v_texCoord;
+            void main() {
+                gl_Position = vec4(a_position, 0.0, 1.0);
+                v_texCoord = a_texCoord;
+            }
+        `;
+
+      const fragmentShaderSource = `
+            precision mediump float;
+            
+            varying vec2 v_texCoord;
+            uniform sampler2D u_textTexture;
+            uniform sampler2D u_noiseTexture;
+            uniform vec2 u_resolution;
+            uniform float u_time;
+            uniform float u_distortionStrength;
+            uniform float u_chromaticSpread;
+            uniform float u_noiseScale;
+            uniform float u_animSpeed;
+            uniform float u_edgeSoftness;
+            uniform float u_direction;
+            
+            float textMask(vec2 uv, vec2 offset) {
+                vec2 dir = vec2(cos(u_direction), sin(u_direction));
+                vec2 noiseUV = uv * u_noiseScale - dir * u_time * u_animSpeed;
+                float noise = texture2D(u_noiseTexture, noiseUV + offset).r;
+                vec2 distortedUV = uv - smoothstep(0.01, 2.0, noise) * u_distortionStrength;
+                
+                float texVal = texture2D(u_textTexture, distortedUV).r;
+                float softness = u_edgeSoftness * 2.0;
+                return smoothstep(0.5 - softness, 0.5 + softness, texVal);
+            }
+            
+            void main() {
+                vec2 uv = vec2(v_texCoord.x, 1.0 - v_texCoord.y);
+                
+                float spread = u_chromaticSpread;
+                
+                float r = textMask(uv, vec2(0.0, spread));
+                float g = textMask(uv, vec2(spread * 0.5, spread * 0.5));
+                float b = textMask(uv, vec2(spread, 0.0));
+                
+                vec3 darkColor = vec3(0.188, 0.188, 0.169);  // #30302b
+                vec3 lightColor = vec3(1.0, 1.0, 0.890);     // #ffffe3
+                
+                vec3 mask = vec3(r, g, b);
+                vec3 color = mix(darkColor, lightColor, 1.0 - mask);
+                
+                gl_FragColor = vec4(color, 1.0);
+            }
+        `;
+
+      // Compile shader
+      function createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          console.error("Shader compile error:", gl.getShaderInfoLog(shader));
+          gl.deleteShader(shader);
+          return null;
+        }
+        return shader;
+      }
+
+      // Create program
+      function createProgram(gl, vertexShader, fragmentShader) {
+        const program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+          console.error("Program link error:", gl.getProgramInfoLog(program));
+          gl.deleteProgram(program);
+          return null;
+        }
+        return program;
+      }
+
+      const vertexShader = createShader(
+        gl,
+        gl.VERTEX_SHADER,
+        vertexShaderSource,
+      );
+      const fragmentShader = createShader(
+        gl,
+        gl.FRAGMENT_SHADER,
+        fragmentShaderSource,
+      );
+      const program = createProgram(gl, vertexShader, fragmentShader);
+
+      // Set up geometry
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+        gl.STATIC_DRAW,
+      );
+
+      const texCoordBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]),
+        gl.STATIC_DRAW,
+      );
+
+      // Get attribute and uniform locations
+      const positionLocation = gl.getAttribLocation(program, "a_position");
+      const texCoordLocation = gl.getAttribLocation(program, "a_texCoord");
+      const textTextureLocation = gl.getUniformLocation(
+        program,
+        "u_textTexture",
+      );
+      const noiseTextureLocation = gl.getUniformLocation(
+        program,
+        "u_noiseTexture",
+      );
+      const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+      const timeLocation = gl.getUniformLocation(program, "u_time");
+      const distortionStrengthLocation = gl.getUniformLocation(
+        program,
+        "u_distortionStrength",
+      );
+      const chromaticSpreadLocation = gl.getUniformLocation(
+        program,
+        "u_chromaticSpread",
+      );
+      const noiseScaleLocation = gl.getUniformLocation(program, "u_noiseScale");
+      const animSpeedLocation = gl.getUniformLocation(program, "u_animSpeed");
+      const edgeSoftnessLocation = gl.getUniformLocation(
+        program,
+        "u_edgeSoftness",
+      );
+      const directionLocation = gl.getUniformLocation(program, "u_direction");
+
+      // Create textures
+      const textTexture = gl.createTexture();
+      const noiseTexture = gl.createTexture();
+
+      // Initialize noise texture
+      generateNoise("turbulence");
+
+      // Render text to canvas
+      function renderText() {
+        const text = document.getElementById("textInput").value || "GLITCH";
+        const font = document.getElementById("fontSelect").value;
+
+        textCtx.fillStyle = "#000";
+        textCtx.fillRect(0, 0, textCanvas.width, textCanvas.height);
+
+        textCtx.fillStyle = "#fff";
+        textCtx.textAlign = "center";
+        textCtx.textBaseline = "middle";
+
+        // Auto-size font
+        let fontSize = 200;
+        textCtx.font = `bold ${fontSize}px "${font}"`;
+        let metrics = textCtx.measureText(text);
+
+        while (metrics.width > textCanvas.width * 0.9 && fontSize > 20) {
+          fontSize -= 5;
+          textCtx.font = `bold ${fontSize}px "${font}"`;
+          metrics = textCtx.measureText(text);
+        }
+
+        textCtx.fillText(text, textCanvas.width / 2, textCanvas.height / 2);
+
+        // Update texture
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textTexture);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          textCanvas,
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      }
+
+      // Get control values
+      function getControls() {
+        return {
+          distortionStrength: parseFloat(
+            document.getElementById("distortionStrength").value,
+          ),
+          chromaticSpread: parseFloat(
+            document.getElementById("chromaticSpread").value,
+          ),
+          noiseScale: parseFloat(document.getElementById("noiseScale").value),
+          animSpeed: parseFloat(document.getElementById("animSpeed").value),
+          edgeSoftness: parseFloat(
+            document.getElementById("edgeSoftness").value,
+          ),
+          direction: parseFloat(document.getElementById("direction").value),
+        };
+      }
+
+      // Update slider value displays
+      function updateSliderDisplays() {
+        document.getElementById("distortionValue").textContent =
+          document.getElementById("distortionStrength").value;
+        document.getElementById("chromaticValue").textContent =
+          document.getElementById("chromaticSpread").value;
+        document.getElementById("noiseValue").textContent =
+          document.getElementById("noiseScale").value;
+        document.getElementById("speedValue").textContent =
+          document.getElementById("animSpeed").value;
+        document.getElementById("edgeValue").textContent =
+          document.getElementById("edgeSoftness").value;
+        const dirRad = parseFloat(document.getElementById("direction").value);
+        document.getElementById("directionValue").textContent =
+          Math.round((dirRad * 180) / Math.PI) + "°";
+      }
+
+      // Animation loop
+      let startTime = Date.now();
+
+      function render() {
+        const time = (Date.now() - startTime) / 1000;
+        const controls = getControls();
+
+        gl.viewport(0, 0, glCanvas.width, glCanvas.height);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.useProgram(program);
+
+        // Set up position attribute
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.enableVertexAttribArray(positionLocation);
+        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+        // Set up texCoord attribute
+        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+        gl.enableVertexAttribArray(texCoordLocation);
+        gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+        // Set uniforms
+        gl.uniform1i(textTextureLocation, 0);
+        gl.uniform1i(noiseTextureLocation, 1);
+        gl.uniform2f(resolutionLocation, glCanvas.width, glCanvas.height);
+        gl.uniform1f(timeLocation, time);
+        gl.uniform1f(distortionStrengthLocation, controls.distortionStrength);
+        gl.uniform1f(chromaticSpreadLocation, controls.chromaticSpread);
+        gl.uniform1f(noiseScaleLocation, controls.noiseScale);
+        gl.uniform1f(animSpeedLocation, controls.animSpeed);
+        gl.uniform1f(edgeSoftnessLocation, controls.edgeSoftness);
+        gl.uniform1f(directionLocation, controls.direction);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        requestAnimationFrame(render);
+      }
+
+      // Event listeners
+      document
+        .getElementById("toggleControls")
+        .addEventListener("click", () => {
+          const btn = document.getElementById("toggleControls");
+          const content = document.getElementById("controlsContent");
+          btn.classList.toggle("collapsed");
+          content.classList.toggle("collapsed");
+        });
+
+      document
+        .getElementById("textInput")
+        .addEventListener("input", renderText);
+      document
+        .getElementById("fontSelect")
+        .addEventListener("change", renderText);
+
+      document.getElementById("noiseType").addEventListener("change", (e) => {
+        const customGroup = document.getElementById("customImageGroup");
+        if (e.target.value === "custom") {
+          customGroup.style.display = "flex";
+        } else {
+          customGroup.style.display = "none";
+          generateNoise(e.target.value);
+        }
+      });
+
+      document.getElementById("customImage").addEventListener("change", (e) => {
+        if (e.target.files[0]) {
+          loadCustomImage(e.target.files[0]);
+        }
+      });
+
+      document.querySelectorAll('input[type="range"]').forEach((slider) => {
+        slider.addEventListener("input", updateSliderDisplays);
+      });
+
+      // Initialize
+      renderText();
+      updateSliderDisplays();
+      render();
+    </script>
+  </body>
+</html>
