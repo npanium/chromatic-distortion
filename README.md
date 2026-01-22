@@ -15,7 +15,7 @@ A WebGL shader effect that renders text with animated chromatic aberration and n
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| **Text** | The text to render | GLITCH |
+| **Text** | The text to render | Distort |
 | **Font** | Typeface selection | Georgia |
 | **Noise Type** | Displacement pattern | Turbulence |
 | **Distortion Strength** | How much the noise displaces the text | 0.06 |
